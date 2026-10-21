@@ -1,0 +1,6 @@
+{
+  "name": "The Glade Runner - Maze Escape",
+  "description": "An atmospheric 2D top-down maze runner game featuring dynamic lighting, procedural maze generation, moving walls, mechanical Grievers, and synthesized Web Audio.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

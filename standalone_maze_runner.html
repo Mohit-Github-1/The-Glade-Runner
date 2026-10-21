@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>The Glade Runner - Maze Escape (Standalone)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0c0a09;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      color: #f5f5f4;
+    }
+    #gameCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+    }
+    /* HUD overlay */
+    #hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 18px;
+      pointer-events: none;
+      z-index: 20;
+    }
+    .hud-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      pointer-events: auto;
+    }
+    .meter-card {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 95px;
+    }
+    .meter-label {
+      font-size: 11px;
+      font-family: monospace;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+    }
+    .meter-bar-bg {
+      width: 100%;
+      height: 8px;
+      background: #1c1917;
+      border: 1px solid #292524;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .meter-fill {
+      height: 100%;
+      transition: width 0.1s linear;
+    }
+    #hpFill { background: #ef4444; width: 100%; }
+    #stamFill { background: #f59e0b; width: 100%; }
+    #batFill { background: #06b6d4; width: 100%; }
+
+    .hud-badge {
+      background: rgba(28, 25, 23, 0.85);
+      border: 1px solid #44403c;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    #hidingBadge {
+      display: none;
+      background: rgba(20, 83, 45, 0.85);
+      border: 1px solid #22c55e;
+      color: #86efac;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-family: monospace;
+      font-weight: 700;
+      animation: pulse 1.5s infinite;
+    }
+
+    /* Radar Minimap */
+    #radarWrapper {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      border: 1px solid #44403c;
+      background: rgba(12, 10, 9, 0.9);
+      border-radius: 6px;
+      overflow: hidden;
+      z-index: 20;
+      cursor: pointer;
+    }
+    #radarCanvas { display: block; }
+
+    /* Tips & Controls */
+    #controlsHelp {
+      position: absolute;
+      bottom: 14px;
+      left: 18px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #78716c;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    /* Touch Controls */
+    #touchZone {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 30;
+      display: none;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 24px;
+    }
+    .touch-btn {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: rgba(28, 25, 23, 0.85);
+      border: 1px solid #57534e;
+      color: #f5f5f4;
+      font-family: monospace;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto;
+      touch-action: none;
+    }
+    #touchSprint.active {
+      background: #f59e0b;
+      color: #0c0a09;
+      box-shadow: 0 0 14px rgba(245, 158, 11, 0.6);
+    }
+    #touchJoyBase {
+      width: 130px;
+      height: 130px;
+      border-radius: 50%;
+      background: rgba(28, 25, 23, 0.4);
+      border: 1px solid #44403c;
+      pointer-events: auto;
+      touch-action: none;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #touchJoyKnob {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(120, 113, 108, 0.8);
+      border: 1px solid #a8a29e;
+      position: absolute;
+    }
+
+    /* Modals & Screens */
+    .modal-screen {
+      position: absolute;
+      inset: 0;
+      background: rgba(12, 10, 9, 0.94);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 50;
+      text-align: center;
+    }
+    .modal-card {
+      background: #1c1917;
+      border: 1px solid #292524;
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 520px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    }
+    h1 { font-size: 32px; font-weight: 800; font-family: monospace; letter-spacing: 1px; margin-bottom: 8px; color: #f5f5f4; }
+    h2 { font-size: 24px; font-weight: 700; font-family: monospace; margin-bottom: 8px; }
+    p { font-size: 14px; color: #a8a29e; line-height: 1.5; margin-bottom: 20px; }
+    .btn {
+      background: #f59e0b;
+      color: #0c0a09;
+      border: none;
+      padding: 12px 24px;
+      font-size: 13px;
+      font-weight: 800;
+      font-family: monospace;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn:hover { background: #fbbf24; transform: translateY(-1px); }
+    .btn-secondary {
+      background: #292524;
+      color: #e7e5e4;
+      border: 1px solid #44403c;
+    }
+    .btn-secondary:hover { background: #44403c; }
+
+    .diff-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .diff-btn {
+      background: #292524;
+      border: 1px solid #44403c;
+      color: #a8a29e;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: monospace;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .diff-btn.active {
+      background: #44403c;
+      border-color: #f59e0b;
+      color: #f5f5f4;
+    }
+
+    #mapModal {
+      position: absolute;
+      inset: 0;
+      background: rgba(12, 10, 9, 0.96);
+      z-index: 45;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    #fullMapCanvas {
+      border: 1px solid #44403c;
+      border-radius: 8px;
+      background: #171717;
+      max-width: 90vw;
+      max-height: 80vh;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-group">
+      <div class="meter-card">
+        <div class="meter-label" style="color:#f87171;"><span>HP</span><span id="hpText">100%</span></div>
+        <div class="meter-bar-bg"><div id="hpFill" class="meter-fill"></div></div>
+      </div>
+      <div class="meter-card">
+        <div class="meter-label" style="color:#fbbf24;"><span>STAMINA</span><span id="stamText">100%</span></div>
+        <div class="meter-bar-bg"><div id="stamFill" class="meter-fill"></div></div>
+      </div>
+      <div class="meter-card">
+        <div class="meter-label" style="color:#38bdf8;"><span>BATTERY [F]</span><span id="batText">100%</span></div>
+        <div class="meter-bar-bg"><div id="batFill" class="meter-fill"></div></div>
+      </div>
+      <div id="hidingBadge">CONCEALED IN IVY</div>
+    </div>
+
+    <div class="hud-group">
+      <div class="hud-badge" style="color:#fbbf24;">KEYS: <span id="keysText">0 / 3</span></div>
+      <div class="hud-badge">TIME: <span id="timeText">08:00</span></div>
+      <div class="hud-badge" style="font-size:11px; color:#a8a29e;">SEED: <span id="seedBadge"></span></div>
+      <button id="pauseBtn" class="btn btn-secondary" style="padding:6px 12px; font-size:11px;">PAUSE</button>
+    </div>
+  </div>
+
+  <!-- Radar Minimap -->
+  <div id="radarWrapper" title="Click to view full map">
+    <canvas id="radarCanvas" width="150" height="150"></canvas>
+  </div>
+
+  <!-- Controls help -->
+  <div id="controlsHelp">WASD / ARROWS: Move | SHIFT: Sprint | F: Flashlight | M: Map | ESC: Pause</div>
+
+  <!-- Touch Controls -->
+  <div id="touchZone">
+    <div id="touchJoyBase">
+      <div id="touchJoyKnob"></div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <div id="touchSprint" class="touch-btn">RUN</div>
+      <div id="touchFlash" class="touch-btn">LIGHT</div>
+      <div id="touchMap" class="touch-btn">MAP</div>
+    </div>
+  </div>
+
+  <!-- Full Tactical Map Modal -->
+  <div id="mapModal">
+    <div style="display:flex; justify-content:space-between; width:100%; max-width:550px; margin-bottom:12px;">
+      <span style="font-family:monospace; font-weight:700;">TACTICAL MAZE MAP</span>
+      <button id="closeMapBtn" class="btn btn-secondary" style="padding:4px 10px; font-size:11px;">CLOSE [M / ESC]</button>
+    </div>
+    <canvas id="fullMapCanvas" width="550" height="550"></canvas>
+  </div>
+
+  <!-- TITLE MENU SCREEN -->
+  <div id="titleScreen" class="modal-screen">
+    <div class="modal-card">
+      <span style="font-size:11px; font-family:monospace; color:#f59e0b; letter-spacing:2px; display:block; margin-bottom:6px;">SURVIVAL LABYRINTH</span>
+      <h1>THE GLADE RUNNER</h1>
+      <p>Trapped in an ancient shifting stone maze. Find all 3 Keys to unlock the Perimeter Gate and escape before nightfall. Watch out for patrolling mechanical Grievers.</p>
+
+      <div style="text-align:left; margin-bottom:8px; font-size:11px; font-family:monospace; color:#a8a29e;">DIFFICULTY</div>
+      <div class="diff-grid">
+        <button class="diff-btn" data-diff="EASY">EASY<br><span style="font-size:9px; color:#78716c;">45x45 · 2 Grievers</span></button>
+        <button class="diff-btn active" data-diff="NORMAL">NORMAL<br><span style="font-size:9px; color:#78716c;">65x65 · 4 Grievers</span></button>
+        <button class="diff-btn" data-diff="HARD">HARD<br><span style="font-size:9px; color:#78716c;">81x81 · 7 Grievers</span></button>
+      </div>
+
+      <div style="text-align:left; margin-bottom:8px; font-size:11px; font-family:monospace; color:#a8a29e;">SEED</div>
+      <div style="display:flex; gap:8px; margin-bottom:24px;">
+        <input id="seedInput" type="text" style="flex:1; background:#0c0a09; border:1px solid #44403c; color:#f5f5f4; font-family:monospace; padding:8px 12px; border-radius:6px; outline:none;" value="GLADE-7492">
+        <button id="randomSeedBtn" class="btn btn-secondary" style="font-size:11px;">RANDOM</button>
+      </div>
+
+      <button id="startBtn" class="btn" style="width:100%; padding:14px; font-size:14px;">ENTER THE MAZE</button>
+    </div>
+  </div>
+
+  <!-- PAUSE MODAL -->
+  <div id="pauseScreen" class="modal-screen" style="display:none;">
+    <div class="modal-card" style="max-width:360px;">
+      <h2>RUN PAUSED</h2>
+      <p id="pauseInfo">Escape in progress...</p>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <button id="resumeBtn" class="btn">RESUME</button>
+        <button id="restartBtn" class="btn btn-secondary">RETRY MAZE</button>
+        <button id="quitBtn" class="btn btn-secondary">TITLE MENU</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VICTORY SCREEN -->
+  <div id="victoryScreen" class="modal-screen" style="display:none;">
+    <div class="modal-card">
+      <span style="color:#22c55e; font-family:monospace; font-size:12px; font-weight:700; letter-spacing:2px;">PERIMETER GATE BREACHED</span>
+      <h1 style="color:#f5f5f4;">YOU ESCAPED!</h1>
+      <p>You outran the shifting walls and evaded the Grievers to reach freedom.</p>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px; font-family:monospace; text-align:left;">
+        <div style="background:#0c0a09; padding:10px; border-radius:6px;"><span style="color:#78716c; font-size:10px;">TIME</span><br><b id="vicTime" style="color:#f59e0b; font-size:16px;">00:00</b></div>
+        <div style="background:#0c0a09; padding:10px; border-radius:6px;"><span style="color:#78716c; font-size:10px;">STEPS</span><br><b id="vicSteps" style="font-size:16px;">0</b></div>
+      </div>
+      <button id="vicPlayAgainBtn" class="btn" style="width:100%;">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <!-- GAME OVER SCREEN -->
+  <div id="gameOverScreen" class="modal-screen" style="display:none;">
+    <div class="modal-card">
+      <span style="color:#ef4444; font-family:monospace; font-size:12px; font-weight:700; letter-spacing:2px;">RUN TERMINATED</span>
+      <h1 style="color:#f87171;">THE MAZE CONSUMED YOU</h1>
+      <p id="deathReason">A mechanical Griever intercepted you in the dark corridors.</p>
+      <div style="display:flex; gap:10px;">
+        <button id="respawnCpBtn" class="btn" style="flex:1; background:#10b981; display:none;">RESPAWN AT CHECKPOINT</button>
+        <button id="retryBtn" class="btn" style="flex:1;">RETRY</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Logic Engine -->
+  <script>
+    // Audio Synthesizer (Web Audio API)
+    let audioCtx = null;
+    function initAudio() {
+      if(!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if(audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function playTone(freq, type, duration, vol=0.2) {
+      try {
+        if(!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type || 'sine';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + duration);
+      } catch(e) {}
+    }
+
+    function playKeyChime() {
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+        setTimeout(() => playTone(f, 'triangle', 0.4, 0.25), i * 70);
+      });
+    }
+
+    function playWallRumble() {
+      playTone(45, 'sawtooth', 0.8, 0.3);
+    }
+
+    function playGrieverGrowl() {
+      try {
+        if(!audioCtx) return;
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const mod = audioCtx.createOscillator();
+        const modGain = audioCtx.createGain();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(260, now);
+        osc.frequency.exponentialRampToValueAtTime(90, now + 0.5);
+        mod.type = 'square';
+        mod.frequency.setValueAtTime(35, now);
+        modGain.gain.setValueAtTime(140, now);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        mod.connect(modGain); modGain.connect(osc.frequency);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        mod.start(now); osc.start(now);
+        mod.stop(now + 0.5); osc.stop(now + 0.5);
+      } catch(e) {}
+    }
+
+    // PRNG
+    function mulberry32(a) {
+      return function() {
+        var t = a += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      }
+    }
+    function hashSeed(str) {
+      let h = 1779033703 ^ str.length;
+      for(let i=0; i<str.length; i++) {
+        h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+        h = (h << 13) | (h >>> 19);
+      }
+      return h >>> 0;
+    }
+
+    // Game Variables
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const radarCanvas = document.getElementById('radarCanvas');
+    const rctx = radarCanvas.getContext('2d');
+    const fullMapCanvas = document.getElementById('fullMapCanvas');
+    const fctx = fullMapCanvas.getContext('2d');
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      if(window.innerWidth < 768) {
+        document.getElementById('touchZone').style.display = 'flex';
+      } else {
+        document.getElementById('touchZone').style.display = 'none';
+      }
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Tile Enums
+    const TILE = { EMPTY: 0, WALL: 1, MOVING: 2, IVY: 3, CHECKPOINT: 4, EXIT: 5, GLADE: 6 };
+    const TILE_SIZE = 64;
+
+    const DIFFS = {
+      EASY: { size: 45, grievers: 2, moving: 4, time: 600 },
+      NORMAL: { size: 65, grievers: 4, moving: 6, time: 480 },
+      HARD: { size: 81, grievers: 7, moving: 10, time: 360 }
+    };
+
+    let curDiff = 'NORMAL';
+    let curSeed = 'GLADE-7492';
+    let gameState = 'TITLE';
+
+    let maze = { size: 65, grid: [], spawn: {x:0, y:0}, exit: {x:0, y:0} };
+    let player = { x:0, y:0, vx:0, vy:0, radius:16, angle:0, hp:100, stam:100, bat:100, flash:false, keys:0, isHiding:false, invuln:0, steps:0 };
+    let camera = { x:0, y:0, scale:1 };
+    let explored = [];
+    let movingWalls = [];
+    let checkpoints = [];
+    let activeCheckpoint = null;
+    let collectibles = [];
+    let grievers = [];
+    let particles = [];
+    let screenShake = { x:0, y:0, timer:0 };
+    let gameTime = 0, timeRemaining = 480;
+
+    // Procedural Textures
+    const wallTex = document.createElement('canvas'); wallTex.width = 64; wallTex.height = 64;
+    {
+      const tc = wallTex.getContext('2d');
+      tc.fillStyle = '#1c1917'; tc.fillRect(0,0,64,64);
+      tc.fillStyle = '#292524'; tc.fillRect(2,2,60,28); tc.fillRect(2,32,28,30); tc.fillRect(32,32,30,30);
+      tc.strokeStyle = '#0c0a09'; tc.lineWidth = 2; tc.strokeRect(2,2,60,28); tc.strokeRect(2,32,28,30); tc.strokeRect(32,32,30,30);
+      tc.fillStyle = 'rgba(22,101,52,0.4)'; tc.beginPath(); tc.arc(14,20,8,0,Math.PI*2); tc.arc(48,48,10,0,Math.PI*2); tc.fill();
+    }
+    const floorTex = document.createElement('canvas'); floorTex.width = 64; floorTex.height = 64;
+    {
+      const fc = floorTex.getContext('2d');
+      fc.fillStyle = '#0f0e0d'; fc.fillRect(0,0,64,64);
+      fc.fillStyle = '#141210'; fc.fillRect(4,4,26,26); fc.fillRect(34,34,26,26);
+    }
+    const gladeTex = document.createElement('canvas'); gladeTex.width = 64; gladeTex.height = 64;
+    {
+      const gc = gladeTex.getContext('2d');
+      gc.fillStyle = '#052e16'; gc.fillRect(0,0,64,64);
+      gc.fillStyle = '#14532d'; gc.fillRect(6,6,24,24); gc.fillRect(34,32,24,24);
+    }
+
+    // Maze Generator DFS
+    function generateLabyrinth(size, seedStr, grieverNum, movingNum) {
+      const rng = mulberry32(hashSeed(seedStr));
+      const grid = Array.from({length: size}, () => new Array(size).fill(TILE.WALL));
+
+      // DFS backtracker
+      const stack = [{x:1, y:1}]; grid[1][1] = TILE.EMPTY;
+      const dirs = [[0,-2],[0,2],[-2,0],[2,0]];
+
+      while(stack.length > 0) {
+        const cur = stack[stack.length - 1];
+        const neighbors = [];
+        const shuffled = dirs.slice().sort(() => rng() - 0.5);
+        for(const [dx, dy] of shuffled) {
+          const nx = cur.x + dx, ny = cur.y + dy;
+          if(nx > 0 && nx < size - 1 && ny > 0 && ny < size - 1 && grid[ny][nx] === TILE.WALL) {
+            neighbors.push({x: nx, y: ny, wx: cur.x + dx/2, wy: cur.y + dy/2});
+          }
+        }
+        if(neighbors.length > 0) {
+          const chosen = neighbors[0];
+          grid[chosen.wy][chosen.wx] = TILE.EMPTY;
+          grid[chosen.y][chosen.x] = TILE.EMPTY;
+          stack.push({x: chosen.x, y: chosen.y});
+        } else {
+          stack.pop();
+        }
+      }
+
+      // Glade sanctuary
+      const c = Math.floor(size / 2);
+      for(let dy = -3; dy <= 3; dy++) {
+        for(let dx = -3; dx <= 3; dx++) {
+          grid[c + dy][c + dx] = TILE.GLADE;
+        }
+      }
+
+      // Loops
+      for(let i=0; i<size*1.6; i++) {
+        const rx = 2 + Math.floor(rng() * (size - 4));
+        const ry = 2 + Math.floor(rng() * (size - 4));
+        if(Math.abs(rx - c) <= 3 && Math.abs(ry - c) <= 3) continue;
+        if(grid[ry][rx] === TILE.WALL) grid[ry][rx] = TILE.EMPTY;
+      }
+
+      // Ivy Alcoves
+      for(let i=0; i<size * 0.35; i++) {
+        const ix = 2 + Math.floor(rng() * (size - 4));
+        const iy = 2 + Math.floor(rng() * (size - 4));
+        if(grid[iy][ix] === TILE.EMPTY) grid[iy][ix] = TILE.IVY;
+      }
+
+      // Exit Gate
+      const exitPos = {x: c, y: 1};
+      grid[exitPos.y][exitPos.x] = TILE.EXIT;
+      grid[exitPos.y + 1][exitPos.x] = TILE.EMPTY;
+
+      // Moving Walls
+      const moving = [];
+      for(let i=0; i<movingNum; i++) {
+        const mx = 4 + Math.floor(rng() * (size - 8));
+        const my = 4 + Math.floor(rng() * (size - 8));
+        if(grid[my][mx] === TILE.EMPTY) {
+          grid[my][mx] = TILE.MOVING;
+          moving.push({ x: mx, y: my, timer: rng() * 16, period: 16 + rng() * 6, progress: 0, state: 'CLOSED' });
+        }
+      }
+
+      // Checkpoints
+      const cps = [
+        {x: Math.floor(size * 0.25), y: Math.floor(size * 0.25)},
+        {x: Math.floor(size * 0.75), y: Math.floor(size * 0.75)}
+      ].map((pt, idx) => {
+        return { id: idx, x: pt.x, y: pt.y, wx: (pt.x + 0.5) * TILE_SIZE, wy: (pt.y + 0.5) * TILE_SIZE, active: false };
+      });
+
+      // Collectibles: 3 Keys
+      const cols = [
+        {id:'k1', type:'KEY', x: 4*TILE_SIZE, y: 4*TILE_SIZE, collected:false},
+        {id:'k2', type:'KEY', x: (size-5)*TILE_SIZE, y: 5*TILE_SIZE, collected:false},
+        {id:'k3', type:'KEY', x: (size-5)*TILE_SIZE, y: (size-5)*TILE_SIZE, collected:false}
+      ];
+
+      // Batteries & Water
+      for(let i=0; i<Math.floor(size*0.18); i++) {
+        cols.push({
+          id: 'b'+i, type: 'BATTERY',
+          x: (2 + Math.floor(rng()*(size-4)) + 0.5)*TILE_SIZE,
+          y: (2 + Math.floor(rng()*(size-4)) + 0.5)*TILE_SIZE,
+          collected: false
+        });
+      }
+      for(let i=0; i<Math.floor(size*0.15); i++) {
+        cols.push({
+          id: 'w'+i, type: 'WATER',
+          x: (2 + Math.floor(rng()*(size-4)) + 0.5)*TILE_SIZE,
+          y: (2 + Math.floor(rng()*(size-4)) + 0.5)*TILE_SIZE,
+          collected: false
+        });
+      }
+
+      // Grievers
+      const grs = [];
+      for(let i=0; i<grieverNum; i++) {
+        grs.push({
+          id: i,
+          x: (c + (rng() > 0.5 ? 8 : -8) + rng()*4 + 0.5)*TILE_SIZE,
+          y: (c + (rng() > 0.5 ? 8 : -8) + rng()*4 + 0.5)*TILE_SIZE,
+          vx:0, vy:0, speed: 100, radius: 20, angle:0,
+          state: 'PATROL', targetX:0, targetY:0, path:[], pathTimer:0, legCycle:0
+        });
+      }
+
+      return {
+        size, grid,
+        spawn: { x: (c + 0.5) * TILE_SIZE, y: (c + 0.5) * TILE_SIZE },
+        exit: { x: (exitPos.x + 0.5) * TILE_SIZE, y: (exitPos.y + 0.5) * TILE_SIZE, gx: exitPos.x, gy: exitPos.y },
+        moving, checkpoints: cps, collectibles: cols, grievers: grs
+      };
+    }
+
+    // Collision
+    function resolveCollision(x, y, radius, grid, moving) {
+      let nx = x, ny = y;
+      const minTX = Math.floor((nx - radius)/TILE_SIZE);
+      const maxTX = Math.floor((nx + radius)/TILE_SIZE);
+      const minTY = Math.floor((ny - radius)/TILE_SIZE);
+      const maxTY = Math.floor((ny + radius)/TILE_SIZE);
+
+      const closedMoving = new Set();
+      moving.forEach(m => { if(m.progress < 0.5) closedMoving.add(`${m.x},${m.y}`); });
+
+      for(let ty = minTY; ty <= maxTY; ty++) {
+        for(let tx = minTX; tx <= maxTX; tx++) {
+          if(ty < 0 || ty >= grid.length || tx < 0 || tx >= grid[0].length) continue;
+          if(grid[ty][tx] === TILE.WALL || closedMoving.has(`${tx},${ty}`)) {
+            const clX = Math.max(tx * TILE_SIZE, Math.min(nx, (tx + 1) * TILE_SIZE));
+            const clY = Math.max(ty * TILE_SIZE, Math.min(ny, (ty + 1) * TILE_SIZE));
+            const dx = nx - clX, dy = ny - clY;
+            const distSq = dx*dx + dy*dy;
+            if(distSq < radius * radius && distSq > 0.001) {
+              const d = Math.sqrt(distSq);
+              nx += (dx / d) * (radius - d);
+              ny += (dy / d) * (radius - d);
+            }
+          }
+        }
+      }
+      return { x: nx, y: ny };
+    }
+
+    // BFS Pathfinding for Grievers
+    function findBFSPath(grid, sx, sy, tx, ty, moving) {
+      if(sx === tx && sy === ty) return [];
+      const visited = {}; const parent = {};
+      const queue = [{x:sx, y:sy}]; visited[`${sx},${sy}`] = true;
+      const closed = new Set();
+      moving.forEach(m => { if(m.progress < 0.5) closed.add(`${m.x},${m.y}`); });
+
+      let found = false, steps = 0;
+      while(queue.length > 0 && steps < 1200) {
+        const cur = queue.shift(); steps++;
+        if(cur.x === tx && cur.y === ty) { found = true; break; }
+        for(const [dx, dy] of [[0,-1],[1,0],[0,1],[-1,0]]) {
+          const nx = cur.x + dx, ny = cur.y + dy;
+          const k = `${nx},${ny}`;
+          if(nx>=0 && nx<grid[0].length && ny>=0 && ny<grid.length && !visited[k]) {
+            if(grid[ny][nx] !== TILE.WALL && !closed.has(k)) {
+              visited[k] = true; parent[k] = cur;
+              queue.push({x:nx, y:ny});
+            }
+          }
+        }
+      }
+      if(!found) return [];
+      const path = [];
+      let c = {x:tx, y:ty};
+      while(c && !(c.x === sx && c.y === sy)) {
+        path.push(c);
+        c = parent[`${c.x},${c.y}`];
+      }
+      path.reverse();
+      return path;
+    }
+
+    // Line of Sight
+    function hasLineOfSight(x0, y0, x1, y1, grid) {
+      const dist = Math.hypot(x1 - x0, y1 - y0);
+      const steps = Math.ceil(dist / 24);
+      for(let i=1; i<steps; i++) {
+        const px = x0 + (x1 - x0) * (i/steps);
+        const py = y0 + (y1 - y0) * (i/steps);
+        const gx = Math.floor(px / TILE_SIZE);
+        const gy = Math.floor(py / TILE_SIZE);
+        if(grid[gy] && grid[gy][gx] === TILE.WALL) return false;
+      }
+      return true;
+    }
+
+    // Inputs
+    const keysDown = {};
+    window.addEventListener('keydown', e => {
+      initAudio();
+      keysDown[e.code] = true;
+      if(e.code === 'KeyF') {
+        player.flash = !player.flash;
+        playTone(player.flash ? 850 : 500, 'triangle', 0.05);
+      }
+      if(e.code === 'KeyM') {
+        const m = document.getElementById('mapModal');
+        m.style.display = m.style.display === 'flex' ? 'none' : 'flex';
+      }
+      if(e.code === 'Escape') {
+        if(gameState === 'PLAYING') pauseGame();
+        else if(gameState === 'PAUSED') resumeGame();
+      }
+    });
+    window.addEventListener('keyup', e => { keysDown[e.code] = false; });
+
+    // Touch Joystick
+    let touchJoy = { active: false, id: null, vx: 0, vy: 0 };
+    const joyBase = document.getElementById('touchJoyBase');
+    const joyKnob = document.getElementById('touchJoyKnob');
+    joyBase.addEventListener('touchstart', e => {
+      initAudio();
+      const t = e.changedTouches[0];
+      touchJoy.active = true; touchJoy.id = t.identifier;
+    });
+    joyBase.addEventListener('touchmove', e => {
+      if(!touchJoy.active) return;
+      for(let i=0; i<e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if(t.identifier === touchJoy.id) {
+          const rect = joyBase.getBoundingClientRect();
+          const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+          const dx = t.clientX - cx, dy = t.clientY - cy;
+          const dist = Math.min(Math.hypot(dx, dy), 45);
+          const ang = Math.atan2(dy, dx);
+          joyKnob.style.transform = `translate(${Math.cos(ang)*dist}px, ${Math.sin(ang)*dist}px)`;
+          touchJoy.vx = (Math.cos(ang)*dist)/45;
+          touchJoy.vy = (Math.sin(ang)*dist)/45;
+        }
+      }
+    });
+    const resetJoy = () => { touchJoy.active = false; touchJoy.vx = 0; touchJoy.vy = 0; joyKnob.style.transform = 'translate(0px,0px)'; };
+    joyBase.addEventListener('touchend', resetJoy);
+    joyBase.addEventListener('touchcancel', resetJoy);
+
+    let touchSprint = false;
+    const sprintBtn = document.getElementById('touchSprint');
+    sprintBtn.addEventListener('touchstart', e => { e.preventDefault(); touchSprint = true; sprintBtn.classList.add('active'); });
+    sprintBtn.addEventListener('touchend', e => { e.preventDefault(); touchSprint = false; sprintBtn.classList.remove('active'); });
+
+    document.getElementById('touchFlash').addEventListener('click', () => {
+      player.flash = !player.flash;
+      playTone(player.flash ? 850 : 500, 'triangle', 0.05);
+    });
+    document.getElementById('touchMap').addEventListener('click', () => {
+      const m = document.getElementById('mapModal');
+      m.style.display = m.style.display === 'flex' ? 'none' : 'flex';
+    });
+    document.getElementById('closeMapBtn').addEventListener('click', () => {
+      document.getElementById('mapModal').style.display = 'none';
+    });
+
+    // Start Game
+    function start(diff, seed) {
+      initAudio();
+      curDiff = diff; curSeed = seed;
+      const cfg = DIFFS[diff];
+      timeRemaining = cfg.time;
+      maze = generateLabyrinth(cfg.size, seed, cfg.grievers, cfg.moving);
+
+      player = {
+        x: maze.spawn.x, y: maze.spawn.y, vx:0, vy:0, radius:16, angle:0,
+        hp:100, stam:100, bat:100, flash:false, keys:0, isHiding:false, invuln:0, steps:0
+      };
+      camera = { x: player.x, y: player.y, scale: window.innerWidth < 768 ? 0.85 : 1 };
+      movingWalls = maze.moving;
+      checkpoints = maze.checkpoints;
+      collectibles = maze.collectibles;
+      grievers = maze.grievers;
+      activeCheckpoint = null;
+      explored = Array.from({length: maze.size}, () => new Array(maze.size).fill(false));
+
+      // Reveal Glade
+      const c = Math.floor(maze.size / 2);
+      for(let dy=-4; dy<=4; dy++) for(let dx=-4; dx<=4; dx++) explored[c+dy][c+dx] = true;
+
+      document.getElementById('seedBadge').innerText = seed;
+      document.getElementById('titleScreen').style.display = 'none';
+      document.getElementById('victoryScreen').style.display = 'none';
+      document.getElementById('gameOverScreen').style.display = 'none';
+      document.getElementById('pauseScreen').style.display = 'none';
+      document.getElementById('respawnCpBtn').style.display = 'none';
+
+      gameState = 'PLAYING';
+    }
+
+    function pauseGame() {
+      gameState = 'PAUSED';
+      document.getElementById('pauseInfo').innerText = `Difficulty: ${curDiff} · Keys: ${player.keys}/3`;
+      document.getElementById('pauseScreen').style.display = 'flex';
+    }
+    function resumeGame() {
+      gameState = 'PLAYING';
+      document.getElementById('pauseScreen').style.display = 'none';
+    }
+
+    document.getElementById('startBtn').onclick = () => start(curDiff, document.getElementById('seedInput').value || 'GLADE-7492');
+    document.getElementById('randomSeedBtn').onclick = () => { document.getElementById('seedInput').value = 'GLADE-' + Math.floor(1000+Math.random()*9000); };
+    document.querySelectorAll('.diff-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        curDiff = btn.dataset.diff;
+      };
+    });
+    document.getElementById('pauseBtn').onclick = pauseGame;
+    document.getElementById('resumeBtn').onclick = resumeGame;
+    document.getElementById('restartBtn').onclick = () => start(curDiff, curSeed);
+    document.getElementById('quitBtn').onclick = () => {
+      document.getElementById('pauseScreen').style.display = 'none';
+      document.getElementById('titleScreen').style.display = 'flex';
+      gameState = 'TITLE';
+    };
+    document.getElementById('vicPlayAgainBtn').onclick = () => start(curDiff, 'GLADE-' + Math.floor(1000+Math.random()*9000));
+    document.getElementById('retryBtn').onclick = () => start(curDiff, curSeed);
+    document.getElementById('respawnCpBtn').onclick = () => {
+      player.x = activeCheckpoint.x; player.y = activeCheckpoint.y;
+      player.hp = 100; player.stam = 100; player.invuln = 2.0;
+      document.getElementById('gameOverScreen').style.display = 'none';
+      gameState = 'PLAYING';
+    };
+
+    // Main Game Loop
+    let lastTime = performance.now();
+    function loop(now) {
+      requestAnimationFrame(loop);
+      const dt = Math.min((now - lastTime)/1000, 0.1);
+      lastTime = now;
+      if(gameState !== 'PLAYING') return;
+
+      gameTime += dt;
+      timeRemaining = Math.max(0, timeRemaining - dt);
+      if(timeRemaining <= 0) {
+        document.getElementById('deathReason').innerText = 'The Glade doors permanently shut as darkness fell.';
+        document.getElementById('gameOverScreen').style.display = 'flex';
+        gameState = 'DEAD';
+      }
+
+      // Input
+      let mx = touchJoy.vx, my = touchJoy.vy;
+      if(keysDown['KeyW'] || keysDown['ArrowUp']) my -= 1;
+      if(keysDown['KeyS'] || keysDown['ArrowDown']) my += 1;
+      if(keysDown['KeyA'] || keysDown['ArrowLeft']) mx -= 1;
+      if(keysDown['KeyD'] || keysDown['ArrowRight']) mx += 1;
+      const len = Math.hypot(mx, my);
+      if(len > 1) { mx /= len; my /= len; }
+
+      const isSprinting = (keysDown['ShiftLeft'] || keysDown['ShiftRight'] || touchSprint) && player.stam > 2 && len > 0.1;
+      if(isSprinting) player.stam = Math.max(0, player.stam - 26 * dt);
+      else player.stam = Math.min(100, player.stam + (len > 0.1 ? 16 : 24) * dt);
+
+      const spd = isSprinting ? 240 : 145;
+      player.vx += (mx * spd - player.vx) * 12 * dt;
+      player.vy += (my * spd - player.vy) * 12 * dt;
+
+      const col = resolveCollision(player.x + player.vx * dt, player.y + player.vy * dt, player.radius, maze.grid, movingWalls);
+      player.x = col.x; player.y = col.y;
+
+      if(len > 0.1) {
+        player.angle = Math.atan2(player.vy, player.vx);
+        player.steps += Math.hypot(player.vx, player.vy) * dt;
+      }
+
+      // Flashlight Battery
+      if(player.flash) {
+        player.bat = Math.max(0, player.bat - 18 * dt);
+        if(player.bat <= 0) player.flash = false;
+      } else {
+        player.bat = Math.min(100, player.bat + 2 * dt);
+      }
+
+      // Ivy Alcove Hiding Check
+      const pgx = Math.floor(player.x / TILE_SIZE), pgy = Math.floor(player.y / TILE_SIZE);
+      player.isHiding = maze.grid[pgy]?.[pgx] === TILE.IVY;
+      document.getElementById('hidingBadge').style.display = player.isHiding ? 'block' : 'none';
+
+      // Explored Fog
+      const revR = player.flash ? 5 : 3;
+      for(let dy=-revR; dy<=revR; dy++) {
+        for(let dx=-revR; dx<=revR; dx++) {
+          const gx = pgx + dx, gy = pgy + dy;
+          if(gx>=0 && gx<maze.size && gy>=0 && gy<maze.size && Math.hypot(dx,dy) <= revR) {
+            explored[gy][gx] = true;
+          }
+        }
+      }
+
+      // Checkpoints
+      checkpoints.forEach(cp => {
+        if(!cp.active && Math.hypot(player.x - cp.wx, player.y - cp.wy) < 32) {
+          cp.active = true; activeCheckpoint = {x: cp.wx, y: cp.wy};
+          playTone(659.25, 'triangle', 0.5);
+          document.getElementById('respawnCpBtn').style.display = 'block';
+        }
+      });
+
+      // Collectibles
+      collectibles.forEach(c => {
+        if(!c.collected && Math.hypot(player.x - c.x, player.y - c.y) < 26) {
+          c.collected = true;
+          if(c.type === 'KEY') { player.keys++; playKeyChime(); }
+          else if(c.type === 'BATTERY') { player.bat = Math.min(100, player.bat + 45); playTone(600, 'sawtooth', 0.2); }
+          else if(c.type === 'WATER') { player.stam = 100; player.hp = Math.min(100, player.hp + 25); playTone(500, 'sine', 0.2); }
+        }
+      });
+
+      // Exit Gate
+      if(Math.hypot(player.x - maze.exit.x, player.y - maze.exit.y) < 40 && player.keys >= 3) {
+        document.getElementById('vicTime').innerText = Math.floor((DIFFS[curDiff].time - timeRemaining)/60) + ':' + Math.floor((DIFFS[curDiff].time - timeRemaining)%60);
+        document.getElementById('vicSteps').innerText = Math.floor(player.steps/32);
+        document.getElementById('victoryScreen').style.display = 'flex';
+        gameState = 'VICTORY';
+      }
+
+      // Moving Walls
+      movingWalls.forEach(m => {
+        m.timer = (m.timer + dt) % m.period;
+        const openDur = m.period * 0.55;
+        if(m.timer < openDur) { m.progress = 1.0; }
+        else if(m.timer < openDur + 1.2) {
+          m.progress = 1.0 - (m.timer - openDur)/1.2;
+          if(m.timer - openDur < dt*1.5) { playWallRumble(); screenShake = {x:0, y:0, timer:0.4}; }
+        } else if(m.timer < m.period - 1.2) { m.progress = 0.0; }
+        else {
+          m.progress = (m.timer - (m.period - 1.2))/1.2;
+          if(m.timer - (m.period - 1.2) < dt*1.5) { playWallRumble(); screenShake = {x:0, y:0, timer:0.3}; }
+        }
+      });
+
+      // Grievers
+      grievers.forEach(gr => {
+        const distP = Math.hypot(gr.x - player.x, gr.y - player.y);
+        const los = hasLineOfSight(gr.x, gr.y, player.x, player.y, maze.grid);
+        const heard = (isSprinting ? distP < 320 : distP < 140) && len > 0.1 && !player.isHiding;
+        const saw = los && distP < 240 && !player.isHiding;
+
+        if((heard || saw) && !player.isHiding) {
+          if(gr.state !== 'CHASE') playGrieverGrowl();
+          gr.state = 'CHASE'; gr.targetX = player.x; gr.targetY = player.y; gr.speed = 135;
+        } else if(player.isHiding) {
+          gr.state = 'PATROL'; gr.speed = 80;
+        }
+
+        gr.pathTimer -= dt;
+        if(gr.pathTimer <= 0) {
+          gr.pathTimer = gr.state === 'CHASE' ? 0.35 : 1.0;
+          const sx = Math.floor(gr.x / TILE_SIZE), sy = Math.floor(gr.y / TILE_SIZE);
+          let tx = Math.floor(gr.targetX / TILE_SIZE), ty = Math.floor(gr.targetY / TILE_SIZE);
+          if(gr.state === 'PATROL' && gr.path.length === 0) {
+            tx = Math.max(1, Math.min(maze.size-2, sx + Math.floor((Math.random()-0.5)*8)));
+            ty = Math.max(1, Math.min(maze.size-2, sy + Math.floor((Math.random()-0.5)*8)));
+          }
+          gr.path = findBFSPath(maze.grid, sx, sy, tx, ty, movingWalls);
+        }
+
+        if(gr.path.length > 0) {
+          const wp = gr.path[0];
+          const wpx = (wp.x + 0.5) * TILE_SIZE, wpy = (wp.y + 0.5) * TILE_SIZE;
+          const dx = wpx - gr.x, dy = wpy - gr.y;
+          const d = Math.hypot(dx, dy);
+          if(d < 14) gr.path.shift();
+          else { gr.vx = (dx/d)*gr.speed; gr.vy = (dy/d)*gr.speed; gr.angle = Math.atan2(gr.vy, gr.vx); }
+        }
+
+        gr.x += gr.vx * dt; gr.y += gr.vy * dt;
+        gr.legCycle += Math.hypot(gr.vx, gr.vy) * dt * 0.1;
+        const gcol = resolveCollision(gr.x, gr.y, gr.radius, maze.grid, movingWalls);
+        gr.x = gcol.x; gr.y = gcol.y;
+
+        // Damage Player
+        if(distP < player.radius + gr.radius && player.invuln <= 0) {
+          player.hp = Math.max(0, player.hp - 30);
+          player.invuln = 1.2;
+          playTone(100, 'sawtooth', 0.2, 0.4);
+          screenShake = {x:0, y:0, timer:0.4};
+          if(player.hp <= 0) {
+            document.getElementById('deathReason').innerText = 'A mechanical Griever struck you down in the dark corridors.';
+            document.getElementById('gameOverScreen').style.display = 'flex';
+            gameState = 'DEAD';
+          }
+        }
+      });
+
+      if(player.invuln > 0) player.invuln -= dt;
+
+      // Camera Lerp
+      camera.x += (player.x - camera.x) * 10 * dt;
+      camera.y += (player.y - camera.y) * 10 * dt;
+
+      // Screen Shake
+      if(screenShake.timer > 0) {
+        screenShake.timer -= dt;
+        screenShake.x = (Math.random()-0.5) * 8;
+        screenShake.y = (Math.random()-0.5) * 8;
+      } else { screenShake.x = 0; screenShake.y = 0; }
+
+      // Update HUD text
+      document.getElementById('hpFill').style.width = player.hp + '%';
+      document.getElementById('hpText').innerText = Math.round(player.hp) + '%';
+      document.getElementById('stamFill').style.width = player.stam + '%';
+      document.getElementById('stamText').innerText = Math.round(player.stam) + '%';
+      document.getElementById('batFill').style.width = player.bat + '%';
+      document.getElementById('batText').innerText = Math.round(player.bat) + '%';
+      document.getElementById('keysText').innerText = player.keys + ' / 3';
+      const m = Math.floor(timeRemaining/60), s = Math.floor(timeRemaining%60);
+      document.getElementById('timeText').innerText = (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+
+      // Draw World
+      ctx.fillStyle = '#050505'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.save();
+      ctx.translate(canvas.width/2 + screenShake.x, canvas.height/2 + screenShake.y);
+      ctx.scale(camera.scale, camera.scale);
+      ctx.translate(-camera.x, -camera.y);
+
+      // Frustum
+      const hw = canvas.width / 2 / camera.scale + TILE_SIZE*2;
+      const hh = canvas.height / 2 / camera.scale + TILE_SIZE*2;
+      const minX = Math.max(0, Math.floor((camera.x - hw)/TILE_SIZE));
+      const maxX = Math.min(maze.size-1, Math.ceil((camera.x + hw)/TILE_SIZE));
+      const minY = Math.max(0, Math.floor((camera.y - hh)/TILE_SIZE));
+      const maxY = Math.min(maze.size-1, Math.ceil((camera.y + hh)/TILE_SIZE));
+
+      for(let ty=minY; ty<=maxY; ty++) {
+        for(let tx=minX; tx<=maxX; tx++) {
+          const t = maze.grid[ty][tx];
+          const wx = tx * TILE_SIZE, wy = ty * TILE_SIZE;
+          if(t === TILE.GLADE) ctx.drawImage(gladeTex, wx, wy, TILE_SIZE, TILE_SIZE);
+          else ctx.drawImage(floorTex, wx, wy, TILE_SIZE, TILE_SIZE);
+
+          if(t === TILE.WALL) {
+            ctx.drawImage(wallTex, wx, wy, TILE_SIZE, TILE_SIZE);
+          } else if(t === TILE.IVY) {
+            ctx.fillStyle = '#166534'; ctx.beginPath();
+            ctx.arc(wx+20, wy+20, 10, 0, Math.PI*2); ctx.arc(wx+44, wy+36, 12, 0, Math.PI*2); ctx.fill();
+          } else if(t === TILE.EXIT) {
+            ctx.fillStyle = player.keys >= 3 ? '#fbbf24' : '#292524';
+            ctx.fillRect(wx, wy, TILE_SIZE, TILE_SIZE);
+            ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 4; ctx.strokeRect(wx+2, wy+2, TILE_SIZE-4, TILE_SIZE-4);
+          }
+        }
+      }
+
+      // Checkpoints
+      checkpoints.forEach(cp => {
+        ctx.fillStyle = cp.active ? '#10b981' : '#0284c7';
+        ctx.beginPath(); ctx.arc(cp.wx, cp.wy, 18, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+      });
+
+      // Moving Walls
+      movingWalls.forEach(mw => {
+        if(mw.progress < 0.99) {
+          const wx = mw.x * TILE_SIZE, wy = mw.y * TILE_SIZE;
+          ctx.save();
+          ctx.beginPath(); ctx.rect(wx, wy, TILE_SIZE, TILE_SIZE); ctx.clip();
+          ctx.translate(0, -mw.progress * TILE_SIZE);
+          ctx.fillStyle = '#44403c'; ctx.fillRect(wx, wy, TILE_SIZE, TILE_SIZE);
+          ctx.strokeStyle = '#eab308'; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.moveTo(wx, wy); ctx.lineTo(wx+TILE_SIZE, wy+TILE_SIZE); ctx.stroke();
+          ctx.restore();
+        }
+      });
+
+      // Collectibles
+      collectibles.forEach(col => {
+        if(!col.collected) {
+          if(col.type === 'KEY') {
+            ctx.fillStyle = '#fbbf24'; ctx.shadowColor = '#f59e0b'; ctx.shadowBlur = 10;
+            ctx.beginPath(); ctx.arc(col.x, col.y - 4, 7, 0, Math.PI*2); ctx.fill();
+            ctx.fillRect(col.x - 2, col.y, 4, 12); ctx.fillRect(col.x + 2, col.y + 6, 4, 3);
+            ctx.shadowBlur = 0;
+          } else if(col.type === 'BATTERY') {
+            ctx.fillStyle = '#06b6d4'; ctx.fillRect(col.x - 6, col.y - 8, 12, 16);
+          } else if(col.type === 'WATER') {
+            ctx.fillStyle = '#3b82f6'; ctx.beginPath(); ctx.arc(col.x, col.y, 8, 0, Math.PI*2); ctx.fill();
+          }
+        }
+      });
+
+      // Grievers
+      grievers.forEach(gr => {
+        ctx.save();
+        ctx.translate(gr.x, gr.y); ctx.rotate(gr.angle);
+        // Legs
+        ctx.strokeStyle = gr.state === 'CHASE' ? '#991b1b' : '#44403c'; ctx.lineWidth = 3;
+        for(let i=0; i<6; i++) {
+          const side = i%2===0 ? 1 : -1;
+          const legWiggle = Math.sin(gr.legCycle + i*1.3) * 6;
+          ctx.beginPath(); ctx.moveTo(0,0);
+          ctx.lineTo(8, (12 + legWiggle)*side);
+          ctx.lineTo(18, (18 + legWiggle)*side);
+          ctx.stroke();
+        }
+        // Body
+        ctx.fillStyle = gr.state === 'CHASE' ? '#450a0a' : '#1c1917';
+        ctx.beginPath(); ctx.ellipse(0, 0, 18, 14, 0, 0, Math.PI*2); ctx.fill();
+        // Eye
+        ctx.fillStyle = gr.state === 'CHASE' ? '#ef4444' : '#f97316';
+        ctx.beginPath(); ctx.arc(10, 0, gr.state === 'CHASE' ? 6 : 4, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+      });
+
+      // Player
+      ctx.save();
+      ctx.translate(player.x, player.y); ctx.rotate(player.angle);
+      if(player.invuln > 0 && Math.floor(gameTime * 20)%2 === 0) ctx.globalAlpha = 0.4;
+      if(player.isHiding) ctx.globalAlpha = 0.55;
+      ctx.fillStyle = player.isHiding ? '#14532d' : '#292524';
+      ctx.beginPath(); ctx.arc(0, 0, player.radius, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = player.isHiding ? '#4ade80' : '#78716c'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#d6d3d1'; ctx.beginPath(); ctx.arc(2, 0, 6, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+
+      ctx.restore();
+
+      // Fog & Dynamic Light
+      ctx.save();
+      const pScreenX = canvas.width/2 + (player.x - camera.x)*camera.scale;
+      const pScreenY = canvas.height/2 + (player.y - camera.y)*camera.scale;
+
+      const lightMask = document.createElement('canvas');
+      lightMask.width = canvas.width; lightMask.height = canvas.height;
+      const lmc = lightMask.getContext('2d');
+      lmc.fillStyle = 'rgba(5, 5, 5, 0.98)'; lmc.fillRect(0,0,canvas.width,canvas.height);
+
+      // Carve explored
+      lmc.save();
+      lmc.globalCompositeOperation = 'destination-out';
+      lmc.fillStyle = 'rgba(0, 0, 0, 0.78)';
+      for(let ty=minY; ty<=maxY; ty++) {
+        for(let tx=minX; tx<=maxX; tx++) {
+          if(explored[ty]?.[tx]) {
+            const sx = canvas.width/2 + (tx*TILE_SIZE - camera.x)*camera.scale;
+            const sy = canvas.height/2 + (ty*TILE_SIZE - camera.y)*camera.scale;
+            lmc.fillRect(sx, sy, TILE_SIZE*camera.scale+1, TILE_SIZE*camera.scale+1);
+          }
+        }
+      }
+
+      // Active circular light
+      const r = (player.flash ? 210 : 140) * camera.scale;
+      const grad = lmc.createRadialGradient(pScreenX, pScreenY, 15, pScreenX, pScreenY, r);
+      grad.addColorStop(0, 'rgba(0,0,0,1)'); grad.addColorStop(0.7, 'rgba(0,0,0,0.95)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+      lmc.fillStyle = grad;
+      lmc.beginPath(); lmc.arc(pScreenX, pScreenY, r, 0, Math.PI*2); lmc.fill();
+
+      // Flashlight cone
+      if(player.flash) {
+        const fr = 360 * camera.scale;
+        const fgrad = lmc.createRadialGradient(pScreenX, pScreenY, 15, pScreenX, pScreenY, fr);
+        fgrad.addColorStop(0, 'rgba(0,0,0,1)'); fgrad.addColorStop(0.7, 'rgba(0,0,0,0.95)'); fgrad.addColorStop(1, 'rgba(0,0,0,0)');
+        lmc.fillStyle = fgrad;
+        lmc.beginPath(); lmc.moveTo(pScreenX, pScreenY);
+        lmc.arc(pScreenX, pScreenY, fr, player.angle - 0.5, player.angle + 0.5);
+        lmc.closePath(); lmc.fill();
+      }
+      lmc.restore();
+
+      ctx.drawImage(lightMask, 0, 0);
+      ctx.restore();
+
+      // Minimap Render
+      renderMap(rctx, radarCanvas.width, radarCanvas.height, false);
+      if(document.getElementById('mapModal').style.display === 'flex') {
+        renderMap(fctx, fullMapCanvas.width, fullMapCanvas.height, true);
+      }
+    }
+
+    function renderMap(mctx, w, h, isFull) {
+      mctx.fillStyle = '#0a0908'; mctx.fillRect(0,0,w,h);
+      const cell = Math.min(w/maze.size, h/maze.size);
+      const ox = (w - maze.size*cell)/2, oy = (h - maze.size*cell)/2;
+
+      for(let y=0; y<maze.size; y++) {
+        for(let x=0; x<maze.size; x++) {
+          if(!explored[y]?.[x] && !isFull) continue;
+          const t = maze.grid[y][x];
+          if(t === TILE.WALL) mctx.fillStyle = '#292524';
+          else if(t === TILE.GLADE) mctx.fillStyle = '#14532d';
+          else if(t === TILE.IVY) mctx.fillStyle = '#047857';
+          else if(t === TILE.EXIT) mctx.fillStyle = '#fbbf24';
+          else mctx.fillStyle = '#44403c';
+          mctx.fillRect(ox + x*cell, oy + y*cell, cell, cell);
+        }
+      }
+
+      // Keys
+      collectibles.forEach(c => {
+        if(!c.collected && c.type === 'KEY') {
+          const gx = Math.floor(c.x / TILE_SIZE), gy = Math.floor(c.y / TILE_SIZE);
+          if(explored[gy]?.[gx] || isFull) {
+            mctx.fillStyle = '#fbbf24';
+            mctx.beginPath(); mctx.arc(ox + (gx+0.5)*cell, oy + (gy+0.5)*cell, Math.max(2, cell*0.7), 0, Math.PI*2); mctx.fill();
+          }
+        }
+      });
+
+      // Player
+      mctx.fillStyle = '#38bdf8';
+      mctx.beginPath();
+      mctx.arc(ox + (player.x/TILE_SIZE)*cell, oy + (player.y/TILE_SIZE)*cell, Math.max(3, cell*1.2), 0, Math.PI*2);
+      mctx.fill();
+
+      // Grievers (if near or full)
+      grievers.forEach(gr => {
+        const d = Math.hypot(gr.x - player.x, gr.y - player.y);
+        if(d < 400 || isFull) {
+          mctx.fillStyle = '#ef4444';
+          mctx.beginPath();
+          mctx.arc(ox + (gr.x/TILE_SIZE)*cell, oy + (gr.y/TILE_SIZE)*cell, Math.max(2, cell*0.8), 0, Math.PI*2);
+          mctx.fill();
+        }
+      });
+    }
+
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
